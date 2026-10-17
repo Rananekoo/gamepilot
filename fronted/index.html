@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GamePilot V5</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC",sans-serif;background:#f5f5f5;color:#222}
+.app{height:100vh;display:flex;overflow:hidden;transition: all 0.3s ease}
+
+/* --- 侧边栏升级：半透明米白色 --- */
+.sidebar{ 
+  width:300px; background:#fff;
+   color:#222; display:flex; flex-direction:column; 
+   transition: width 0.3s ease, opacity 0.3s ease; border-right: 1px solid #ddd; 
+   z-index: 10; }
+/* 折叠状态 */
+.sidebar.collapsed {
+    width: 0; 
+    opacity: 0; 
+    pointer-events: none; 
+    border: none;
+}
+
+.brand{padding:22px 20px 12px;font-size:22px;font-weight:700;color:#333}
+.modebar{display:flex;gap:8px;padding:8px 14px 14px}
+/* 模式按钮色调调整 */
+.modebtn{ flex:1; border:0; border-radius:9px; padding:10px 6px; background:#eee; color:#666; cursor:pointer; transition: 0.2s }
+.modebtn:hover{background:#dfddd7}
+.modebtn.active{background:#BDE0FE;color:#5A7D9A}
+
+.newchat{margin:0 14px 12px;padding:11px;border:0;border-radius:8px;background:#BDE0FE;color:#5A7D9A;font-size:15px;cursor:pointer}
+.search{ margin:0 14px 12px; padding:10px 12px; border:0; border-radius:8px; background:#eee; color:#444; outline:none }
+.chatlist{flex:1;overflow:auto;padding:0 8px}
+.chatitem{padding:12px;border-radius:9px;margin-bottom:4px;cursor:pointer;transition: 0.2s}
+.chatitem:hover,.chatitem.active{background:#f5f5f5}
+.chattitle{font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#333}
+.preview{font-size:12px;color:#888;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+.userpanel{padding:14px;border-top:1px solid rgba(0,0,0,0.05);display:flex;align-items:center;gap:10px}
+.avatar{width:40px;height:40px;border-radius:50%;object-fit:cover;background:#ddd}
+.userinfo{flex:1;min-width:0}
+.username{font-size:14px;font-weight:600;color:#333}
+.status{font-size:12px;color:#aaa;margin-top:3px}
+.settingsbtn{border:0;background:transparent;color:#888;font-size:20px;cursor:pointer}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0;background:#f7f7f7;transition: all 0.3s ease}
+.header{height:64px;background:#fff;border-bottom:1px solid #ddd;display:flex;align-items:center;padding:0 22px;gap:12px}
+
+/* --- 新增：侧边栏开关按钮 --- */
+.toggle-sidebar{
+    border:0; background:#eee; border-radius:6px; width:32px; height:32px; 
+    cursor:pointer; font-size:16px; margin-right:8px; transition: 0.2s
+}
+.toggle-sidebar:hover{background:#ddd}
+
+.header-title{font-weight:700;font-size:17px}
+.header-mode{font-size:12px;color:#888}
+.messages{flex:1;overflow:auto;padding:24px}
+.message{display:flex;gap:10px;margin-bottom:18px;max-width:850px}
+.message.user{margin-left:auto;flex-direction:row-reverse}
+.message .avatar{width:36px;height:36px;flex:none}
+.bubble{padding:11px 14px;border-radius:12px;line-height:1.6;white-space:pre-wrap;word-break:break-word;max-width:680px}
+.message.ai .bubble{background:var(--ai-bubble,#fff);border:1px solid #e6e6e6}
+.message.user .bubble{background:var(--user-bubble,#95ec69)}
+.time{font-size:10px;color:#aaa;margin-top:4px}
+.inputbar{padding:14px 18px;background:#fff;border-top:1px solid #ddd;display:flex;gap:10px}
+.input{flex:1;min-height:46px;max-height:120px;resize:none;border:1px solid #ddd;border-radius:10px;padding:12px;outline:none;font:inherit}
+.send{width:78px;border:0;border-radius:10px;background:#BDE0FE;color:#5A7D9A;font-size:15px;cursor:pointer}
+.send:disabled{opacity:.55}
+.empty{height:100%;display:flex;align-items:center;justify-content:center;color:#999}
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:10}
+.panel{position:absolute;right:0;top:0;height:100%;width:min(440px,92vw);background:#fff;padding:24px;overflow:auto}
+.panel h2{margin-top:0}
+.close{float:right;border:0;background:none;font-size:24px;cursor:pointer}
+.field{margin:16px 0}
+.field label{display:block;font-size:13px;font-weight:600;margin-bottom:7px}
+.field input,.field textarea,.field select{width:100%;padding:10px;border:1px solid #ddd;border-radius:8px;font:inherit}
+.field textarea{min-height:90px;resize:vertical}
+.save{width:100%;padding:12px;border:0;border-radius:9px;background:#BDE0FE;color:#5A7D9A;font-size:15px;cursor:pointer}
+.reset{width:100%;padding:10px;border:1px solid #ddd;border-radius:9px;background:#fff;margin-top:10px;cursor:pointer}
+.mode-note{padding:10px;background:#f5f5f5;border-radius:8px;font-size:12px;color:#666;line-height:1.5}
+.typing{color:#999;font-size:13px;padding:8px 0}
+.memory-box{margin-top:24px;padding-top:20px;border-top:1px solid #eee}
+.memory-list{margin:10px 0;display:flex;flex-direction:column;gap:8px}
+.memory-item{display:flex;align-items:flex-start;gap:8px;background:#f7f7f7;border:1px solid #eee;border-radius:9px;padding:10px}
+.memory-text{flex:1;font-size:13px;line-height:1.5;word-break:break-word}
+.memory-delete{border:0;background:none;color:#999;cursor:pointer;font-size:18px;line-height:1}
+.memory-delete:hover{color:#e44}
+.memory-empty{font-size:13px;color:#999;padding:8px 0}
+.memory-actions{display:flex;gap:8px;margin-top:10px}
+.memory-actions button{flex:1;padding:9px;border-radius:8px;cursor:pointer}
+.memory-refresh{border:1px solid #ddd;background:#fff}
+.memory-clear{border:1px solid #f0b8b8;background:#fff;color:#d44}
+.memory-add{display:flex;gap:8px;margin-top:10px}
+.memory-add input{flex:1;padding:9px;border:1px solid #ddd;border-radius:8px;font:inherit}
+.memory-add button{padding:9px 12px;border:0;border-radius:8px;background:#BDE0FE;color:#5A7D9A;cursor:pointer}
+@media(max-width:700px){.sidebar{width:220px}.messages{padding:14px}.bubble{max-width:70vw}}
+</style>
+</head>
+
+<body>
+<div class="app">
+
+  <aside id="sidebar" class="sidebar">
+    <div class="brand">🎮 GamePilot</div>
+
+    <div class="modebar">
+      <button id="companionMode" class="modebtn active" onclick="setMode('companion')">🤖 陪伴</button>
+      <button id="analysisMode" class="modebtn" onclick="setMode('analysis')">📊 分析</button>
+    </div>
+
+    <button class="newchat" onclick="createNewChat()">＋ 新建聊天</button>
+    <input id="search" class="search" placeholder="搜索聊天..." oninput="renderChatList()">
+
+    <div id="chatList" class="chatlist"></div>
+
+    <div class="userpanel">
+      <img id="userAvatarSmall" class="avatar">
+      <div class="userinfo">
+        <div id="userNameSmall" class="username">我</div>
+        <div class="status">GamePilot</div>
+      </div>
+      <button class="settingsbtn" onclick="openSettings()">⚙️</button>
+    </div>
+  </aside>
+
+  <main class="main">
+    <header class="header">
+      <!-- 新增：折叠侧边栏按钮 -->
+      <button class="toggle-sidebar" onclick="toggleSidebar()">☰</button>
+      <img id="aiAvatarHeader" class="avatar">
+      <div>
+        <div id="headerTitle" class="header-title">小派</div>
+        <div id="headerMode" class="header-mode">AI 陪伴模式</div>
+      </div>
+    </header>
+
+    <section id="messages" class="messages"></section>
+
+    <div class="inputbar">
+      <textarea id="input" class="input" placeholder="和 AI 聊点什么……"></textarea>
+      <button id="send" class="send" onclick="sendMessage()">发送</button>
+    </div>
+  </main>
+</div>
+
+<!-- 设置面板 (保持不变) -->
+<div id="overlay" class="overlay" onclick="closeSettings(event)">
+  <div class="panel" onclick="event.stopPropagation()">
+    <button class="close" onclick="closeSettings()">×</button>
+    <h2>🤖 AI 人设</h2>
+    <div class="mode-note">这里设置的内容会作为 AI 的长期人设使用。</div>
+    <div class="field"><label>AI 名称</label><input id="aiName" placeholder="例如：小派"></div>
+    <div class="field"><label>性格</label><input id="aiPersonality" placeholder="例如：活泼、温柔、幽默"></div>
+    <div class="field"><label>说话方式</label><input id="aiStyle" placeholder="例如：像朋友一样自然聊天"></div>
+    <div class="field"><label>兴趣爱好</label><input id="aiInterests" placeholder="例如：游戏、动漫"></div>
+    <div class="field"><label>怎么称呼我</label><input id="userCallName" placeholder="例如：慧慧"></div>
+    <div class="field"><label>自定义完整人设</label><textarea id="aiPersona"></textarea></div>
+    <button class="save" onclick="savePersona()">💾 保存 AI 人设</button>
+    <h2 style="margin-top:30px">🎨 外观设置</h2>
+    <div class="field"><label>AI 头像</label><input id="aiAvatarFile" type="file" accept="image/*"></div>
+    <div class="field"><label>我的头像</label><input id="userAvatarFile" type="file" accept="image/*"></div>
+    <div class="field"><label>聊天背景图片</label><input id="backgroundFile" type="file" accept="image/*"></div>
+    <div class="field"><label>聊天背景颜色</label><input id="backgroundColor" type="color"></div>
+    <div class="field"><label>我的气泡颜色</label><input id="userBubbleColor" type="color"></div>
+    <div class="field"><label>AI 气泡颜色</label><input id="aiBubbleColor" type="color"></div>
+    <div class="memory-box">
+      <h2>🧠 长期记忆</h2>
+      <div class="mode-note">这里可以查看 GamePilot 自动记住的内容。</div>
+      <div id="memoryList" class="memory-list"></div>
+      <div class="memory-add"><input id="memoryInput" placeholder="例如：用户喜欢原神"><button onclick="addMemoryFromUI()">添加</button></div>
+      <div class="memory-actions">
+        <button class="memory-refresh" onclick="loadMemories()">↻ 刷新</button>
+        <button class="memory-clear" onclick="clearAllMemories()">清空全部</button>
+      </div>
+    </div>
+    <h2 style="margin-top:30px">👤 用户设置</h2>
+    <div class="field"><label>我的昵称</label><input id="userName" placeholder="例如：慧慧"></div>
+    <button class="save" onclick="saveAppearance()">💾 保存外观设置</button>
+    <button class="reset" onclick="resetSettings()">恢复默认设置</button>
+  </div>
+</div>
+
+<script>
+// --- 新增：折叠侧边栏逻辑 ---
+function toggleSidebar(){
+  const sb = document.getElementById("sidebar");
+  sb.classList.toggle("collapsed");
+}
+
+// 原有 JS 逻辑保持不变 ...
+const DEFAULT_AI_AVATAR = "https://api.dicebear.com/9.x/bottts/svg?seed=GamePilot";
+const DEFAULT_USER_AVATAR = "https://api.dicebear.com/9.x/personas/svg?seed=User";
+let chats = JSON.parse(localStorage.getItem("gamepilot_chats_v1") || "[]");
+let activeChatId = localStorage.getItem("gamepilot_active_chat_v1");
+let currentMode = localStorage.getItem("gamepilot_mode_v1") || "companion";
+
+function getAIName(){ return localStorage.getItem("aiName") || "小派"; }
+function getUserName(){ return localStorage.getItem("userName") || "我"; }
+function getAIAvatar(){ return localStorage.getItem("aiAvatar") || DEFAULT_AI_AVATAR; }
+function getUserAvatar(){ return localStorage.getItem("userAvatar") || DEFAULT_USER_AVATAR; }
+
+function buildPersona(){
+  const personality = localStorage.getItem("aiPersonality") || "友好、自然、耐心";
+  const style = localStorage.getItem("aiStyle") || "像朋友一样自然聊天";
+  const interests = localStorage.getItem("aiInterests") || "游戏、动漫";
+  const callName = localStorage.getItem("userCallName") || getUserName();
+  const custom = localStorage.getItem("aiPersona") || "";
+  return `你是 ${getAIName()}。性格：${personality}, 风格：${style}, 兴趣：${interests}, 称呼用户：${callName}\n${custom}`;
+}
+
+function ensureChat(){
+  if(!chats.length) createNewChat(false);
+  if(!activeChatId || !chats.some(c => c.id === activeChatId)) {
+    activeChatId = chats[0].id;
+    saveChats();
+  }
+}
+function saveChats(){
+  localStorage.setItem("gamepilot_chats_v1", JSON.stringify(chats));
+  localStorage.setItem("gamepilot_active_chat_v1", activeChatId);
+}
+function getActiveChat(){ return chats.find(c => c.id === activeChatId); }
+function createNewChat(render=true){
+  const chat = { id: Date.now().toString(), title: "新聊天", preview: "开始一段新的对话", messages: [], createdAt: Date.now() };
+  chats.unshift(chat);
+  activeChatId = chat.id;
+  saveChats();
+  if(render){ renderChatList(); renderMessages(); }
+}
+function switchChat(id){
+  activeChatId = id;
+  saveChats();
+  renderChatList();
+  renderMessages();
+}
+function deleteChat(id, event){
+  event.stopPropagation();
+  chats = chats.filter(c => c.id !== id);
+  if(!chats.length) createNewChat(false);
+  if(activeChatId === id) activeChatId = chats[0].id;
+  saveChats();
+  renderChatList();
+  renderMessages();
+}
+function renderChatList(){
+  const list = document.getElementById("chatList");
+  const keyword = document.getElementById("search").value.toLowerCase();
+  list.innerHTML = "";
+  chats.filter(chat => chat.title.toLowerCase().includes(keyword) || chat.preview.toLowerCase().includes(keyword))
+    .forEach(chat => {
+      const item = document.createElement("div");
+      item.className = "chatitem" + (chat.id === activeChatId ? " active" : "");
+      item.innerHTML = `<div style="display:flex;justify-content:space-between;gap:8px">
+        <div style="min-width:0"><div class="chattitle">${escapeHtml(chat.title)}</div><div class="preview">${escapeHtml(chat.preview)}</div></div>
+        <button style="border:0;background:none;color:#888;cursor:pointer" onclick="deleteChat('${chat.id}',event)">×</button>
+      </div>`;
+      item.onclick = () => switchChat(chat.id);
+      list.appendChild(item);
+    });
+}
+function renderMessages(){
+  const container = document.getElementById("messages");
+  const chat = getActiveChat();
+  container.innerHTML = "";
+  if(!chat || !chat.messages.length){
+    container.innerHTML = `<div class="empty"><div><div style="font-size:42px;text-align:center">🤖</div><div style="text-align:center;margin-top:10px">和 ${escapeHtml(getAIName())} 聊点什么吧</div></div></div>`;
+    return;
+  }
+  chat.messages.forEach(msg => {
+    const row = document.createElement("div");
+    row.className = "message " + msg.role;
+    const avatar = msg.role === "user" ? getUserAvatar() : getAIAvatar();
+    row.innerHTML = `<img class="avatar" src="${avatar}"><div><div class="bubble">${escapeHtml(msg.text)}</div><div class="time">${msg.time || ""}</div></div>`;
+    container.appendChild(row);
+  });
+  container.scrollTop = container.scrollHeight;
+}
+function escapeHtml(text){
+  const div = document.createElement("div");
+  div.textContent = text || "";
+  return div.innerHTML;
+}
+function nowTime(){ return new Date().toLocaleTimeString("zh-CN", {hour:"2-digit", minute:"2-digit"}); }
+function setMode(mode){
+  currentMode = mode;
+  localStorage.setItem("gamepilot_mode_v1", mode);
+  document.getElementById("companionMode").classList.toggle("active", mode === "companion");
+  document.getElementById("analysisMode").classList.toggle("active", mode === "analysis");
+  document.getElementById("headerMode").textContent = mode === "companion" ? "AI 陪伴模式" : "游戏数据分析模式";
+  document.getElementById("input").placeholder = mode === "companion" ? "和 AI 聊点什么……" : "例如：哪个角色最受欢迎？";
+  renderMessages();
+}
+async function sendMessage(){
+  const input = document.getElementById("input");
+  const send = document.getElementById("send");
+  const question = input.value.trim();
+  if(!question) return;
+  const chat = getActiveChat();
+  if(!chat) return;
+  chat.messages.push({role:"user", text:question, time:nowTime()});
+  if(chat.messages.length === 1) chat.title = question.slice(0,18);
+  chat.preview = question;
+  input.value = "";
+  renderMessages();
+  renderChatList();
+  send.disabled = true;
+  send.textContent = "…";
+  try{
+    const response = await fetch("http://127.0.0.1:8000/chat", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({question:question, persona:buildPersona(), mode:currentMode})
+    });
+    if(!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    chat.messages.push({role:"ai", text:data.answer || "我暂时没有想好怎么回答。", time:nowTime()});
+    chat.preview = data.answer || "";
+  }catch(error){
+    chat.messages.push({role:"ai", text:"连接不到 GamePilot 后端，请确认 FastAPI 正在运行。", time:nowTime()});
+    console.error(error);
+  }finally{
+    send.disabled = false;
+    send.textContent = "发送";
+    saveChats();
+    renderMessages();
+    renderChatList();
+  }
+}
+async function loadMemories(){
+  const list = document.getElementById("memoryList");
+  if(!list) return;
+  list.innerHTML = '<div class="memory-empty">正在读取记忆……</div>';
+  try{
+    const response = await fetch("http://127.0.0.1:8000/memory");
+    if(!response.ok) throw new Error("HTTP " + response.status);
+    const data = await response.json();
+    const memories = data.memories || [];
+    if(!memories.length){
+      list.innerHTML = '<div class="memory-empty">目前还没有长期记忆。</div>';
+      return;
+    }
+    list.innerHTML = "";
+    memories.forEach(memory => {
+      const item = document.createElement("div");
+      item.className = "memory-item";
+      const text = document.createElement("div");
+      text.className = "memory-text";
+      text.textContent = memory;
+      const button = document.createElement("button");
+      button.className = "memory-delete";
+      button.textContent = "×";
+      button.onclick = () => deleteMemoryFromUI(memory);
+      item.appendChild(text);
+      item.appendChild(button);
+      list.appendChild(item);
+    });
+  }catch(error){
+    console.error(error);
+    list.innerHTML = '<div class="memory-empty">读取失败，请确认 FastAPI 正在运行。</div>';
+  }
+}
+async function addMemoryFromUI(){
+  const input = document.getElementById("memoryInput");
+  const content = input.value.trim();
+  if(!content) return;
+  try{
+    const response = await fetch("http://127.0.0.1:8000/memory", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({content})
+    });
+    if(!response.ok) throw new Error("HTTP " + response.status);
+    input.value = "";
+    await loadMemories();
+  }catch(error){
+    console.error(error);
+    alert("添加记忆失败，请确认 FastAPI 正在运行。");
+  }
+}
+async function deleteMemoryFromUI(content){
+  if(!confirm("确定删除这条记忆吗？\n\n" + content)) return;
+  try{
+    const response = await fetch("http://127.0.0.1:8000/memory/delete", {
+      method:"POST",
+      headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({content})
+    });
+    if(!response.ok) throw new Error("HTTP " + response.status);
+    await loadMemories();
+  }catch(error){
+    console.error(error);
+    alert("删除记忆失败，请确认 FastAPI 正在运行。");
+  }
+}
+async function clearAllMemories(){
+  if(!confirm("确定清空全部长期记忆吗？")) return;
+  try{
+    const response = await fetch("http://127.0.0.1:8000/memory/clear", {
+      method:"POST"
+    });
+    if(!response.ok) throw new Error("HTTP " + response.status);
+    await loadMemories();
+  }catch(error){
+    console.error(error);
+    alert("清空记忆失败，请确认 FastAPI 正在运行。");
+  }
+}
+function openSettings(){
+  loadMemories();
+  document.getElementById("aiName").value = localStorage.getItem("aiName") || "小派";
+  document.getElementById("aiPersonality").value = localStorage.getItem("aiPersonality") || "活泼、温柔、幽默";
+  document.getElementById("aiStyle").value = localStorage.getItem("aiStyle") || "像朋友一样自然聊天";
+  document.getElementById("aiInterests").value = localStorage.getItem("aiInterests") || "游戏、动漫";
+  document.getElementById("userCallName").value = localStorage.getItem("userCallName") || "";
+  document.getElementById("aiPersona").value = localStorage.getItem("aiPersona") || "";
+  document.getElementById("userName").value = getUserName();
+  document.getElementById("backgroundColor").value = localStorage.getItem("backgroundColor") || "#f7f7f7";
+  document.getElementById("userBubbleColor").value = localStorage.getItem("userBubbleColor") || "#95ec69";
+  document.getElementById("aiBubbleColor").value = localStorage.getItem("aiBubbleColor") || "#ffffff";
+  document.getElementById("aiAvatarFile").value = "";
+  document.getElementById("userAvatarFile").value = "";
+  document.getElementById("backgroundFile").value = "";
+  document.getElementById("overlay").style.display = "block";
+}
+function closeSettings(event){
+  if(event && event.target !== event.currentTarget) return;
+  document.getElementById("overlay").style.display = "none";
+}
+function savePersona(){
+  localStorage.setItem("aiName", document.getElementById("aiName").value.trim() || "小派");
+  localStorage.setItem("aiPersonality", document.getElementById("aiPersonality").value.trim());
+  localStorage.setItem("aiStyle", document.getElementById("aiStyle").value.trim());
+  localStorage.setItem("aiInterests", document.getElementById("aiInterests").value.trim());
+  localStorage.setItem("userCallName", document.getElementById("userCallName").value.trim());
+  localStorage.setItem("aiPersona", document.getElementById("aiPersona").value.trim());
+  applySettings();
+  alert("AI 人设保存成功！");
+}
+function readImageFile(file){
+  return new Promise((resolve, reject) => {
+    if(!file) return resolve(null);
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = () => reject(reader.error);
+    reader.readAsDataURL(file);
+  });
+}
+async function saveAppearance(){
+  localStorage.setItem("userName", document.getElementById("userName").value.trim() || "我");
+  localStorage.setItem("backgroundColor", document.getElementById("backgroundColor").value);
+  localStorage.setItem("userBubbleColor", document.getElementById("userBubbleColor").value);
+  localStorage.setItem("aiBubbleColor", document.getElementById("aiBubbleColor").value);
+  try{
+    const aiAvatar = await readImageFile(document.getElementById("aiAvatarFile").files[0]);
+    const userAvatar = await readImageFile(document.getElementById("userAvatarFile").files[0]);
+    const background = await readImageFile(document.getElementById("backgroundFile").files[0]);
+    if(aiAvatar) localStorage.setItem("aiAvatar", aiAvatar);
+    if(userAvatar) localStorage.setItem("userAvatar", userAvatar);
+    if(background) localStorage.setItem("chatBackground", background);
+    applySettings();
+    alert("外观设置保存成功！");
+  }catch(error){
+    console.error(error);
+    alert("图片保存失败，请换一张较小的图片再试。");
+  }
+}
+function applySettings(){
+  document.getElementById("userNameSmall").textContent = getUserName();
+  document.getElementById("userAvatarSmall").src = getUserAvatar();
+  document.getElementById("aiAvatarHeader").src = getAIAvatar();
+  document.getElementById("headerTitle").textContent = getAIName();
+  const bgColor = localStorage.getItem("backgroundColor") || "#f7f7f7";
+  const messages = document.querySelector(".messages");
+  const bgImage = localStorage.getItem("chatBackground");
+  document.body.style.background = bgColor;
+  messages.style.backgroundColor = bgColor;
+  if(bgImage){
+    messages.style.backgroundImage = `url("${bgImage}")`;
+    messages.style.backgroundSize = "cover";
+    messages.style.backgroundPosition = "center";
+    messages.style.backgroundAttachment = "fixed";
+  }else{
+    messages.style.backgroundImage = "none";
+  }
+  document.documentElement.style.setProperty("--user-bubble", localStorage.getItem("userBubbleColor") || "#95ec69");
+  document.documentElement.style.setProperty("--ai-bubble", localStorage.getItem("aiBubbleColor") || "#ffffff");
+  setMode(currentMode);
+  renderMessages();
+}
+function resetSettings(){
+  if(!confirm("确定恢复默认设置吗？")) return;
+  ["aiName","aiPersonality","aiStyle","aiInterests","userCallName","aiPersona","userName","backgroundColor","userBubbleColor","aiBubbleColor","aiAvatar","userAvatar","chatBackground"].forEach(key => localStorage.removeItem(key));
+  location.reload();
+}
+document.getElementById("input").addEventListener("keydown", function(e){
+  if(e.key === "Enter" && !e.shiftKey){
+    e.preventDefault();
+    sendMessage();
+  }
+});
+ensureChat();
+applySettings();
+renderChatList();
+renderMessages();
+</script>
+</body>
+</html>
+```
